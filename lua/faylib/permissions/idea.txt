@@ -1,0 +1,3 @@
+create an interface to quickly poll a rank whether a server uses ulx, serverguard, the built in system, etc.
+
+Should be able to easily tell if one product is installed and use that

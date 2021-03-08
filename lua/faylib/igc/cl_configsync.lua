@@ -32,6 +32,9 @@ any IGC:GetClientKey(string addonName, string keyName)
 any IGC:GetSharedKey(string addonName, string keyName)
  - Attempts to get the value of a shared configuration variable for the given addon
  - returns nil if not found
+ 
+boolean IGC:IsSharedReady()
+ - Returns true if the initial shared config sync has occurred (happens during server join, during client lua startup)
 
 void IGC:SetClientKey(string addonName, string keyName, any newValue)
  - Sets an existing client-side configuration key for the specified addon to the specified value
@@ -42,6 +45,7 @@ void IGC:SaveClientConfig(string addonName, fileName, folderName="faylib")
 void IGC:LoadClientConfig(string addonName, fileName, folderName="faylib")
  - Attempts to load a saved client-side configuration for the given addon from the provided folder and fileName
  - saves configuration of default values (from IGC:DefineClientKey) if the file is not found
+ - If a previously declared key is not present in loaded config, the default value of that key will be inserted into the config table
 
 HOOKS:
 
@@ -74,6 +78,7 @@ end
 FayLib[modName]["Config"] = FayLib[modName]["Config"] || {}
 FayLib[modName]["Config"]["Client"] = FayLib[modName]["Config"]["Client"] || {}
 FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
+FayLib[modName]["Config"]["SharedReady"] = FayLib[modName]["Config"]["SharedReady"] || false
 
 local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
 local function canSetAsValue(value)
@@ -139,6 +144,10 @@ addAPIFunction("GetSharedKey", function(addonName, keyName)
 	return FayLib[modName]["Config"]["Shared"][addonName]["_"..keyName]
 end)
 
+addAPIFunction("IsSharedReady", function() 
+	return FayLib[modName]["Config"]["SharedReady"]
+end)
+
 addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
 	if !canSetAsValue(newValue) then
 		FayLib.Backend.Log("IGC - An invalid value was being assigned to key \""..keyName.."\", so the key could not be set", true)
@@ -180,10 +189,12 @@ addAPIFunction("SaveClientConfig", function(addonName, fileName, folderName)
 end)
 
 addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
+	-- add default variable if folder name not given
 	if folderName == nil then
 		folderName = "faylib"
 	end
 	
+	-- load provided config file
 	folderName = tostring(folderName)
 	fileName = tostring(fileName)
 	local loadStr = file.Read( folderName.."/"..fileName..".json", "DATA" )
@@ -193,10 +204,27 @@ addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
 		return
 	end
 	
+	-- turn config into table format and check for declared config variables that are missing from file
+	local fileTable = util.JSONToTable( loadStr )
+	local fileKeyList = table.GetKeys(fileTable)
+	local verifyKeyList = table.GetKeys(FayLib[modName]["Config"]["Client"][addonName])
+	local notFoundVars = {}
+	for _,key in ipairs(verifyKeyList) do
+		if !table.HasValue(fileKeyList, key) then
+			notFoundVars[key] = FayLib[modName]["Config"]["Client"][addonName][key]
+		end
+	end
 	
-	FayLib[modName]["Config"]["Client"][addonName] = util.JSONToTable( loadStr )
+	-- load config into provided addon table
+	FayLib[modName]["Config"]["Client"][addonName] = fileTable
 	
-	--add fix for "Colors will not have the color metatable" bug
+	-- add missing variables from before
+	for key,val in pairs(notFoundVars) do
+		FayLib[modName]["Config"]["Client"][addonName][key] = val
+		print("Big Chungus Client: "..key)
+	end
+	
+	-- add fix for "Colors will not have the color metatable" bug
 	local keyList = table.GetKeys(FayLib[modName]["Config"]["Client"][addonName])
 	for i=1,#keyList do
 		if type(FayLib[modName]["Config"]["Client"][addonName][keyList[i]]) == "table" then
@@ -208,6 +236,7 @@ addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
 		end
 	end
 	
+	-- fire related hooks
 	hook.Run("IGCConfigUpdate", addonName)
 	hook.Run("IGCClientConfigUpdate", addonName)
 end)
@@ -252,6 +281,7 @@ net.Receive( "FAYLIB_IGC_SYNCFIRST", function( len )
 		end
 	end
 	
+	FayLib[modName]["Config"]["SharedReady"] = true
 	hook.Run("IGCSharedConfigReady")
 end )
 

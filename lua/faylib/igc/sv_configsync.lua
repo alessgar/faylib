@@ -47,6 +47,7 @@ void IGC:LoadConfig(string addonName, fileName, folderName="faylib")
  - Attempts to load a saved server-side/shared configuration for the given addon from the provided folder and fileName
  - saves configuration of default values (from IGC:DefineKey) if the file is not found
  - Automatically syncs shared configuration of addon with all connected players if configuration file is successfully loaded
+ - If a previously declared key is not present in loaded config, the default value of that key will be inserted into the config table
 
 HOOKS:
 
@@ -212,10 +213,12 @@ addAPIFunction("SaveConfig", function(addonName, fileName, folderName)
 end)
 
 addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
+	-- add default variable if folder name not given
 	if folderName == nil then
 		folderName = "faylib"
 	end
 	
+	-- load provided config file
 	folderName = tostring(folderName)
 	fileName = tostring(fileName)
 	local loadStr = file.Read( folderName.."/"..fileName..".json", "DATA" )
@@ -225,9 +228,27 @@ addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 		return
 	end
 	
-	FayLib[modName]["Config"]["Server"][addonName] = util.JSONToTable( loadStr )
+	-- turn config into table format and check for declared config variables that are missing from file
+	local fileTable = util.JSONToTable( loadStr )
+	local fileKeyList = table.GetKeys(fileTable)
+	local verifyKeyList = table.GetKeys(FayLib[modName]["Config"]["Server"][addonName])
+	local notFoundVars = {}
+	for _,key in ipairs(verifyKeyList) do
+		if !table.HasValue(fileKeyList, key) then
+			notFoundVars[key] = FayLib[modName]["Config"]["Server"][addonName][key]
+		end
+	end
 	
-	--add fix for "Colors will not have the color metatable" bug
+	-- load config into provided addon table
+	FayLib[modName]["Config"]["Server"][addonName] = fileTable
+	
+	-- add missing variables from before
+	for key,val in pairs(notFoundVars) do
+		FayLib[modName]["Config"]["Server"][addonName][key] = val
+		print("Big Chungus Server: "..key)
+	end
+	
+	-- add fix for "Colors will not have the color metatable" bug
 	local keyList = table.GetKeys(FayLib[modName]["Config"]["Server"][addonName])
 	for i=1,#keyList do
 		if type(FayLib[modName]["Config"]["Server"][addonName][keyList[i]]) == "table" then
@@ -239,13 +260,14 @@ addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 		end
 	end
 	
-	--copy any "shared" keys to the shared config table
+	-- copy any "shared" keys to the shared config table
 	for i=1,#keyList do
 		if FayLib[modName]["ConfigLookup"][addonName][keyList[i]] then
 			FayLib[modName]["Config"]["Shared"][addonName][keyList[i]] = FayLib[modName]["Config"]["Server"][addonName][keyList[i]]
 		end
 	end
 	
+	-- sync new shared table with client and fire related hooks
 	FayLib[modName]["SyncShared"](addonName)
 	hook.Run("IGCConfigUpdate", addonName)
 	hook.Run("IGCServerConfigUpdate", addonName)

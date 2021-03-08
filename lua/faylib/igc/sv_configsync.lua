@@ -81,6 +81,7 @@ FayLib[modName]["Config"]["Server"] = FayLib[modName]["Config"]["Server"] || {}
 FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
 FayLib[modName]["ConfigLookup"] = FayLib[modName]["ConfigLookup"] || {}
 
+-- returns whether give value can be stored in config
 local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
 local function canSetAsValue(value)
 	if !table.HasValue( allowedTypes, type(value) ) then
@@ -90,6 +91,7 @@ local function canSetAsValue(value)
 	return true
 end
 
+-- returns whether value is NaN or INF
 local function isNANOrINF(value)
 	if type(value)=="number" then
 		if value == (1/0) || value ~= value then
@@ -100,6 +102,7 @@ local function isNANOrINF(value)
 	return false
 end
 
+-- returns whether value is "true" or "false" or not
 local function isStringBool(value)
 	if(type(value) == "string") then
 		return (value == "true" || value == "false")
@@ -274,6 +277,7 @@ addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 	hook.Run("IGCSharedConfigUpdate", addonName)
 end)
 
+-- when a client requests a first-time shared config sync, send off the entire shared table instead of the normal single addon table
 net.Receive( "FAYLIB_IGC_SYNCFIRST", function( len, ply )
 	local sharedString = util.TableToJSON( FayLib[modName]["Config"]["Shared"] )
 	net.Start("FAYLIB_IGC_SYNCFIRST")

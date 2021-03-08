@@ -80,6 +80,7 @@ FayLib[modName]["Config"]["Client"] = FayLib[modName]["Config"]["Client"] || {}
 FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
 FayLib[modName]["Config"]["SharedReady"] = FayLib[modName]["Config"]["SharedReady"] || false
 
+-- returns whether give value can be stored in config
 local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
 local function canSetAsValue(value)
 	if !table.HasValue( allowedTypes, type(value) ) then
@@ -89,6 +90,7 @@ local function canSetAsValue(value)
 	return true
 end
 
+-- returns whether value is NaN or INF
 local function isNANOrINF(value)
 	if type(value)=="number" then
 		if value == (1/0) || value ~= value then
@@ -99,6 +101,7 @@ local function isNANOrINF(value)
 	return false
 end
 
+-- returns whether value is "true" or "false" or not
 local function isStringBool(value)
 	if(type(value) == "string") then
 		return (value == "true" || value == "false")
@@ -241,6 +244,7 @@ addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
 	hook.Run("IGCClientConfigUpdate", addonName)
 end)
 
+-- handles shared variable sync from server
 net.Receive( "FAYLIB_IGC_SYNC", function( len )
 	local addonName = net.ReadString()
 	local sharedString = net.ReadString()
@@ -262,6 +266,7 @@ net.Receive( "FAYLIB_IGC_SYNC", function( len )
 	hook.Run("IGCSharedConfigUpdate", addonName)
 end )
 
+-- handles first-time shared config sync during client lua startup
 net.Receive( "FAYLIB_IGC_SYNCFIRST", function( len )
 	local sharedString = net.ReadString()
 	FayLib[modName]["Config"]["Shared"] = util.JSONToTable( sharedString )
@@ -285,6 +290,7 @@ net.Receive( "FAYLIB_IGC_SYNCFIRST", function( len )
 	hook.Run("IGCSharedConfigReady")
 end )
 
+-- as soon as possible, start the first-time shared config sync request
 hook.Add( "InitPostEntity", "FAYLIB_IGC_CLIENTINITSYNC", function()
 	net.Start("FAYLIB_IGC_SYNCFIRST")
 	net.SendToServer()

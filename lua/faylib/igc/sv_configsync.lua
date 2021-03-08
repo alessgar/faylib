@@ -248,7 +248,6 @@ addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 	-- add missing variables from before
 	for key,val in pairs(notFoundVars) do
 		FayLib[modName]["Config"]["Server"][addonName][key] = val
-		print("Big Chungus Server: "..key)
 	end
 	
 	-- add fix for "Colors will not have the color metatable" bug

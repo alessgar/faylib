@@ -47,6 +47,7 @@ FayLib[modName] = FayLib[modName] || {}
 local function addAPIFunction(funcName, functionCode)
     FayLib.Backend.AddToAPI(modName, funcName, functionCode)
 end
+-- END BOILERPLATE CODE
 
 FayLib[modName]["Segments"] = FayLib[modName]["Segments"] || {}
 FayLib[modName]["IdentifierLookup"] = FayLib[modName]["IdentifierLookup"] || {}
@@ -86,15 +87,19 @@ end
 local function completeTable(identifier, segmentCount, netStr, ply)
     local finalTableJSON = ""
 
+    -- piece string together
     for i = 1, segmentCount do
         finalTableJSON = finalTableJSON .. FayLib[modName]["ReceivedSegments"][identifier][i]
     end
 
+    -- delete data that is no longer needed
     FayLib[modName]["ReceivedSegments"][identifier] = nil
 
+    -- turn string back into table
     local finalTable = {}
     FayLib[modName].receiveTableHelper(finalTable, util_JSONToTable(finalTableJSON))
 
+    -- fire callback
     FayLib[modName]["SegmentCallbacks"][netStr](finalTable, ply)
 end
 
@@ -102,12 +107,15 @@ end
 local function completeString(identifier, segmentCount, netStr, ply)
     local finalString = ""
 
+    -- piece string together
     for i = 1, segmentCount do
         finalString = finalString .. FayLib[modName]["ReceivedSegments"][identifier][i]
     end
 
+    -- delete data that is no longer needed
     FayLib[modName]["ReceivedSegments"][identifier] = nil
 
+    -- fire callback
     FayLib[modName]["SegmentCallbacks"][netStr](finalString, ply)
 end
 
@@ -197,6 +205,7 @@ FayLib[modName].writeTableHelper = function(root, inputTable)
     end
 end
 
+-- prepares a given string for transmission
 FayLib[modName].stringSetup = function(inputString)
     -- determine size of string
     local tableSize = string_len( inputString ) + 1
@@ -215,6 +224,7 @@ FayLib[modName].stringSetup = function(inputString)
     return localIdentifier, segmentCount
 end
 
+-- converts a table into a string to prepare it for transmission
 FayLib[modName].tableSetup = function(inputTable)
     local sendingTable = {}
     FayLib[modName].writeTableHelper(sendingTable, inputTable)
@@ -225,6 +235,7 @@ FayLib[modName].tableSetup = function(inputTable)
     return FayLib[modName].stringSetup(tableString)
 end
 
+-- save identifying information about an identifier for later
 FayLib[modName].setupLookup = function(localIdentifier, segmentCount, netStr, sentType)
     FayLib[modName]["IdentifierLookup"][localIdentifier] = {
         NetStr = netStr,
@@ -234,10 +245,11 @@ FayLib[modName].setupLookup = function(localIdentifier, segmentCount, netStr, se
     }
 end
 
+-- every minute, remove any leftover packets that are more than 10 minutes old for security/memory saving
 timer_Create( "BPACKETS_CLEANUP", 60, 0, function()
     local curTime = os_time()
     for identifier,identifierInfo in pairs(FayLib[modName]["IdentifierLookup"]) do
-        if curTime - identifierInfo.CreationTime > 300 then
+        if curTime - identifierInfo.CreationTime > 600 then
             FayLib[modName]["IdentifierLookup"][identifier] = nil
             FayLib[modName]["Segments"][identifier] = nil
         end

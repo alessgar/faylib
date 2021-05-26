@@ -73,10 +73,12 @@ end
 
 ]]--
 
+-- send table to server
 addAPIFunction("SendTableToServer", function(netStr, inputTable)
     -- clean the table
     local localIdentifier, segmentCount = FayLib[modName].tableSetup(inputTable)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
@@ -92,10 +94,12 @@ addAPIFunction("SendTableToServer", function(netStr, inputTable)
     net_SendToServer()
 end)
 
+-- send string to server
 addAPIFunction("SendStringToServer", function(netStr, inputString)
     -- clean the string
     local localIdentifier, segmentCount = FayLib[modName].stringSetup(inputString)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
@@ -111,6 +115,7 @@ addAPIFunction("SendStringToServer", function(netStr, inputString)
     net_SendToServer()
 end)
 
+-- handle incoming packets
 net_Receive("BPACKETS_CLIENTREQ", function(len)
     local identifier = net_ReadString()
     local segmentNum = net_ReadInt(8)

@@ -86,10 +86,12 @@ end
 
 ]]--
 
+-- send table to specific player
 addAPIFunction("SendTable", function(netStr, inputTable, ply)
     -- clean the table
     local localIdentifier, segmentCount = FayLib[modName].tableSetup(inputTable)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The table you were trying to send exceeds maximum size limits (5MB). The table will not be sent.", true)
     end
@@ -105,10 +107,12 @@ addAPIFunction("SendTable", function(netStr, inputTable, ply)
     net_Send( ply )
 end)
 
+-- send table to all players
 addAPIFunction("BroadcastTable", function(netStr, inputTable)
     -- clean the table
     local localIdentifier, segmentCount = FayLib[modName].tableSetup(inputTable)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The table you were trying to send exceeds maximum size limits (5MB). The table will not be sent.", true)
     end
@@ -124,10 +128,12 @@ addAPIFunction("BroadcastTable", function(netStr, inputTable)
     net_Broadcast()
 end)
 
+-- send string to specific player
 addAPIFunction("SendString", function(netStr, inputString, ply)
     -- clean the string
     local localIdentifier, segmentCount = FayLib[modName].stringSetup(inputString)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
@@ -143,10 +149,12 @@ addAPIFunction("SendString", function(netStr, inputString, ply)
     net_Send( ply )
 end)
 
+-- send string to all players
 addAPIFunction("BroadcastString", function(netStr, inputString)
     -- clean the string
     local localIdentifier, segmentCount = FayLib[modName].stringSetup(inputString)
 
+    -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
@@ -162,6 +170,7 @@ addAPIFunction("BroadcastString", function(netStr, inputString)
     net_Broadcast()
 end)
 
+-- handle incoming packets
 net_Receive("BPACKETS_SERVREQ", function(len, ply)
     local identifier = net_ReadString()
     local segmentNum = net_ReadInt(8)

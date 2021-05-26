@@ -142,17 +142,21 @@ local function colorFix(realm, addonName)
 	end
 end
 
+-- defines a key in the given addons config
 addAPIFunction("DefineClientKey", function(addonName, keyName, defaultValue)
+	-- make sure the value type is supported
 	if !canSetAsValue(defaultValue) then
 		FayLib.Backend.Log("IGC - An invalid value value being assigned to key \"" .. keyName .. "\" ", true)
 		return
 	end
 
+	-- values cannot be NAN or INF
 	if isNANOrINF(defaultValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
 		defaultValue = 0
 	end
 
+	-- string representations of booleans must be converted to booleans
 	if isStringBool(defaultValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
 		if defaultValue == "true" then
@@ -164,36 +168,45 @@ addAPIFunction("DefineClientKey", function(addonName, keyName, defaultValue)
 
 	keyName = "_" .. keyName
 
+	-- apply new value to config
 	FayLib[modName]["Config"]["Client"][addonName] = FayLib[modName]["Config"]["Client"][addonName] || {}
 	FayLib[modName]["Config"]["Client"][addonName][keyName] = defaultValue
 
+	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCClientConfigUpdate", addonName)
 end)
 
+-- gets the current state of the client key in the given addon
 addAPIFunction("GetClientKey", function(addonName, keyName)
 	return FayLib[modName]["Config"]["Client"][addonName]["_" .. keyName]
 end)
 
+-- gets the current state of the shared key in the given addon
 addAPIFunction("GetSharedKey", function(addonName, keyName)
 	return FayLib[modName]["Config"]["Shared"][addonName]["_" .. keyName]
 end)
 
+-- fetch whether the shared cache has been fetched for the first time
 addAPIFunction("IsSharedReady", function()
 	return FayLib[modName]["Config"]["SharedReady"]
 end)
 
+-- overwrite a kay with new data
 addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
+	-- make sure the value type is supported
 	if !canSetAsValue(newValue) then
 		FayLib.Backend.Log("IGC - An invalid value was being assigned to key \"" .. keyName .. "\", so the key could not be set", true)
 		return
 	end
 
+	-- values cannot be NAN or INF
 	if isNANOrINF(newValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
 		newValue = 0
 	end
 
+	-- string representations of booleans must be converted to booleans
 	if isStringBool(newValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
 		if newValue == "true" then
@@ -205,12 +218,15 @@ addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
 
 	keyName = "_" .. keyName
 
+	-- apply new value to config
 	FayLib[modName]["Config"]["Client"][addonName][keyName] = newValue
 
+	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCClientConfigUpdate", addonName)
 end)
 
+-- save configuration to disk
 addAPIFunction("SaveClientConfig", function(addonName, fileName, folderName)
 	if folderName == nil then
 		folderName = "faylib"
@@ -223,6 +239,7 @@ addAPIFunction("SaveClientConfig", function(addonName, fileName, folderName)
 	file_Write( folderName .. "/" .. fileName .. ".json", saveString)
 end)
 
+-- load configuration from disk
 addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
 	-- add default variable if folder name not given
 	if folderName == nil then

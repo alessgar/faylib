@@ -130,21 +130,25 @@ local function isStringBool(value)
 	return false
 end
 
+-- defines a key in the given addons config
 addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMode)
 	if sharedMode == nil then
 		sharedMode = false
 	end
 
+	-- make sure the value type is supported
 	if !canSetAsValue(defaultValue) then
 		FayLib.Backend.Log("IGC - An invalid value value being assigned to key \"" .. keyName .. "\" ", true)
 		return
 	end
 
+	-- values cannot be NAN or INF
 	if isNANOrINF(defaultValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
 		defaultValue = 0
 	end
 
+	-- string representations of booleans must be converted to booleans
 	if isStringBool(defaultValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
 		if defaultValue == "true" then
@@ -156,6 +160,7 @@ addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMod
 
 	keyName = "_" .. keyName
 
+	-- apply new value to config
 	FayLib[modName]["Config"]["Server"][addonName] = FayLib[modName]["Config"]["Server"][addonName] || {}
 	FayLib[modName]["Config"]["Server"][addonName][keyName] = defaultValue
 	FayLib[modName]["ConfigLookup"][addonName] = FayLib[modName]["ConfigLookup"][addonName] || {}
@@ -165,6 +170,7 @@ addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMod
 		FayLib[modName]["Config"]["Shared"][addonName][keyName] = defaultValue
 	end
 
+	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCServerConfigUpdate", addonName)
 	if sharedMode then
@@ -172,21 +178,26 @@ addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMod
 	end
 end)
 
+-- gets the current state of the key in the given addon
 addAPIFunction("GetKey", function(addonName, keyName)
 	return FayLib[modName]["Config"]["Server"][addonName]["_" .. keyName]
 end)
 
+-- overwrite a kay with new data
 addAPIFunction("SetKey", function(addonName, keyName, newValue)
+	-- make sure the value type is supported
 	if !canSetAsValue(newValue) then
 		FayLib.Backend.Log("IGC - An invalid value was being assigned to key \"" .. keyName .. "\", so the key could not be set", true)
 		return
 	end
 
+	-- values cannot be NAN or INF
 	if isNANOrINF(newValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
 		newValue = 0
 	end
 
+	-- string representations of booleans must be converted to booleans
 	if isStringBool(newValue) then
 		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
 		if newValue == "true" then
@@ -198,11 +209,13 @@ addAPIFunction("SetKey", function(addonName, keyName, newValue)
 
 	keyName = "_" .. keyName
 
+	-- apply new value to config
 	FayLib[modName]["Config"]["Server"][addonName][keyName] = newValue
 	if FayLib[modName]["ConfigLookup"][addonName][keyName] then
 		FayLib[modName]["Config"]["Shared"][addonName][keyName] = newValue
 	end
 
+	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCServerConfigUpdate", addonName)
 	if sharedMode then
@@ -210,6 +223,7 @@ addAPIFunction("SetKey", function(addonName, keyName, newValue)
 	end
 end)
 
+-- sync any updated shared variables to the client
 addAPIFunction("SyncShared", function(addonName, ply)
 	local sharedString = util_TableToJSON( FayLib[modName]["Config"]["Shared"][addonName] )
 	net_Start("FAYLIB_IGC_SYNC")
@@ -222,6 +236,7 @@ addAPIFunction("SyncShared", function(addonName, ply)
 	end
 end)
 
+-- save configuration to disk
 addAPIFunction("SaveConfig", function(addonName, fileName, folderName)
 	if folderName == nil then
 		folderName = "faylib"
@@ -234,6 +249,7 @@ addAPIFunction("SaveConfig", function(addonName, fileName, folderName)
 	file_Write( folderName .. "/" .. fileName .. ".json", saveString)
 end)
 
+-- load configuration from disk
 addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 	-- add default variable if folder name not given
 	if folderName == nil then

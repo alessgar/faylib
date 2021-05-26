@@ -1,3 +1,0 @@
-if net message is >60KB, break into chunks and send part after part, piecing together the final message on the other side
-
-include a hard data cap to avoid infinite transfers

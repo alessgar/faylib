@@ -50,11 +50,6 @@ void BPackets:SetupReceiver(string netStr, function callback)
 
 local FayLib = FayLib
 
-local net_Start = net.Start
-local net_WriteBool = net.WriteBool
-local net_WriteString = net.WriteString
-local net_WriteInt = net.WriteInt
-local net_SendToServer = net.SendToServer
 local net_Receive = net.Receive
 local net_ReadString = net.ReadString
 local net_ReadInt = net.ReadInt
@@ -86,12 +81,7 @@ addAPIFunction("SendTableToServer", function(netStr, inputTable)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "Table")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("Table")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_SendToServer()
+    FayLib[modName].SendHandshakePacket(netStr, "Table", localIdentifier, segmentCount)
 end)
 
 -- send string to server
@@ -107,28 +97,13 @@ addAPIFunction("SendStringToServer", function(netStr, inputString)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "String")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("String")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_SendToServer()
+    FayLib[modName].SendHandshakePacket(netStr, "String", localIdentifier, segmentCount)
 end)
 
 -- handle incoming packets
 net_Receive("BPACKETS_CLIENTREQ", function(len)
     local identifier = net_ReadString()
     local segmentNum = net_ReadInt(8)
-    local netStr = FayLib[modName]["IdentifierLookup"][identifier].NetStr
-    local segmentCount = FayLib[modName]["IdentifierLookup"][identifier].SegmentCount
-    local sentType = FayLib[modName]["IdentifierLookup"][identifier].Type
 
-    net_Start( netStr )
-        net_WriteBool(false)
-        net_WriteString(sentType)
-        net_WriteString(identifier)
-        net_WriteInt(segmentCount, 8)
-        net_WriteInt(segmentNum, 8)
-        net_WriteString(FayLib[modName]["Segments"][identifier][segmentNum])
-    net_SendToServer()
+    FayLib[modName].networkReceiveFunc(identifier, segmentNum)
 end)

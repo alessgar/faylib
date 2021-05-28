@@ -40,6 +40,8 @@ local string_sub = string.sub
 local util_TableToJSON = util.TableToJSON
 local os_time = os.time
 local timer_Create = timer.Create
+local net_WriteBool = net.WriteBool
+local net_Broadcast = net.Broadcast
 
 local modName = "BPackets"
 FayLib[modName] = FayLib[modName] || {}
@@ -83,28 +85,8 @@ FayLib[modName].isStringBool = function(value)
     return false
 end
 
--- Uses all segments to piece the table back together, before calling the callback function
-local function completeTable(identifier, segmentCount, netStr, ply)
-    local finalTableJSON = ""
-
-    -- piece string together
-    for i = 1, segmentCount do
-        finalTableJSON = finalTableJSON .. FayLib[modName]["ReceivedSegments"][identifier][i]
-    end
-
-    -- delete data that is no longer needed
-    FayLib[modName]["ReceivedSegments"][identifier] = nil
-
-    -- turn string back into table
-    local finalTable = {}
-    FayLib[modName].receiveTableHelper(finalTable, util_JSONToTable(finalTableJSON))
-
-    -- fire callback
-    FayLib[modName]["SegmentCallbacks"][netStr](finalTable, ply)
-end
-
--- Uses all segments to piece the string back together, before calling the callback function
-local function completeString(identifier, segmentCount, netStr, ply)
+-- Uses all segments to piece the string/table back together, before calling the callback function
+local function completeObject(identifier, segmentCount, netStr, isTable, ply)
     local finalString = ""
 
     -- piece string together
@@ -115,8 +97,16 @@ local function completeString(identifier, segmentCount, netStr, ply)
     -- delete data that is no longer needed
     FayLib[modName]["ReceivedSegments"][identifier] = nil
 
+    local finalObj = finalString
+
+    -- turn string back into table, if needed
+    if isTable then
+        finalObj = {}
+        FayLib[modName].receiveTableHelper(finalObj, util_JSONToTable(finalString))
+    end
+
     -- fire callback
-    FayLib[modName]["SegmentCallbacks"][netStr](finalString, ply)
+    FayLib[modName]["SegmentCallbacks"][netStr](finalObj, ply)
 end
 
 --[[
@@ -142,6 +132,22 @@ FayLib[modName].receiveTableHelper = function(root, inputTable)
     end
 end
 
+-- reused code between both sv and cl APIs, used to request next segment of table/string
+FayLib[modName].networkReceiveFunc = function(identifier, segmentNum, ply)
+    local netStr = FayLib[modName]["IdentifierLookup"][identifier].NetStr
+    local segmentCount = FayLib[modName]["IdentifierLookup"][identifier].SegmentCount
+    local sentType = FayLib[modName]["IdentifierLookup"][identifier].Type
+
+    net_Start( netStr )
+        net_WriteBool(false)
+        net_WriteString(sentType)
+        net_WriteString(identifier)
+        net_WriteInt(segmentCount, 8)
+        net_WriteInt(segmentNum, 8)
+        net_WriteString(FayLib[modName]["Segments"][identifier][segmentNum])
+    if SERVER then net_Send(ply) else net_SendToServer() end
+end
+
 -- The equivalent of net.Receive, but for our large tables.
 addAPIFunction("SetupReceiver", function(netStr, callback)
     FayLib[modName]["SegmentCallbacks"][netStr] = callback
@@ -151,22 +157,31 @@ addAPIFunction("SetupReceiver", function(netStr, callback)
         local sentType = net_ReadString()
         local identifier = net_ReadString()
         local segmentCount = net_ReadInt(8)
+
+        -- determine whether handsake or data chunk message
         if mode then
             FayLib[modName]["ReceivedSegments"][identifier] = {}
+
+            -- request first data chunk message
             if SERVER then net_Start( "BPACKETS_CLIENTREQ" ) else net_Start( "BPACKETS_SERVREQ" ) end
                 net_WriteString(identifier)
                 net_WriteInt(1, 8)
             if SERVER then net_Send( ply ) else net_SendToServer() end
         else
+            -- store data chunk for concatenation later
             local segmentNum = net_ReadInt(8)
             FayLib[modName]["ReceivedSegments"][identifier][segmentNum] = net_ReadString()
+
+            -- check if all chunks received
             if #table_GetKeys(FayLib[modName]["ReceivedSegments"][identifier]) == segmentCount then
+                -- if true, concatenate and fire callback
                 if sentType == "Table" then
-                    completeTable(identifier, segmentCount, netStr, ply)
+                    completeObject(identifier, segmentCount, netStr, true, ply)
                 elseif sentType == "String" then
-                    completeString(identifier, segmentCount, netStr, ply)
+                    completeObject(identifier, segmentCount, netStr, false, ply)
                 end
             else
+                -- if not, request next chunk
                 if SERVER then net_Start( "BPACKETS_CLIENTREQ" ) else net_Start( "BPACKETS_SERVREQ" ) end
                     net_WriteString(identifier)
                     net_WriteInt(segmentNum + 1, 8)
@@ -182,15 +197,34 @@ end)
 
 ]]--
 
+-- Send the handshake packet, which informs the other end (assuming receiver is set up) about a new table/string incoming
+FayLib[modName].SendHandshakePacket = function(netStr, objType, localIdentifier, segmentCount, broadcast, ply)
+    net_Start( netStr )
+        net_WriteBool(true)
+        net_WriteString("Table")
+        net_WriteString(localIdentifier)
+        net_WriteInt(segmentCount, 8)
+    if SERVER then
+        if broadcast then
+            net_Broadcast()
+        else
+            net_Send(ply)
+        end
+    else
+        net_SendToServer()
+    end
+end
+
 -- recursive function to clean data and make a deep copy
 FayLib[modName].writeTableHelper = function(root, inputTable)
     for key,value in pairs(inputTable) do
-        if type(value) == "table" then
+        if type(value) == "table" then -- recursion
             root[key] = {}
             FayLib[modName].writeTableHelper(root[key], value)
-        elseif FayLib[modName].canSetAsValue(value) && !FayLib[modName].isNANOrINF(v) then
-            if FayLib[modName].isStringBool(value) then
+        elseif FayLib[modName].canSetAsValue(value) && !FayLib[modName].isNANOrINF(v) then -- check for valid values for networked table
+            if FayLib[modName].isStringBool(value) then -- check if string representaiton of bool (must be converted)
                 FayLib.Backend.Log("BPackets - A value (" .. tostring(key) .. " , " .. tostring(value) .. ") was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead due to techinical limits.", true)
+
                 if value == "true" then
                     value = true
                 else

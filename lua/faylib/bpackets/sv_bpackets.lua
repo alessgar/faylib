@@ -59,12 +59,6 @@ void BPackets:SetupReceiver(string netStr, function callback)
 local FayLib = FayLib
 
 local util_AddNetworkString = util.AddNetworkString
-local net_Start = net.Start
-local net_WriteBool = net.WriteBool
-local net_WriteString = net.WriteString
-local net_WriteInt = net.WriteInt
-local net_Send = net.Send
-local net_Broadcast = net.Broadcast
 local net_Receive = net.Receive
 local net_ReadString = net.ReadString
 local net_ReadInt = net.ReadInt
@@ -99,12 +93,7 @@ addAPIFunction("SendTable", function(netStr, inputTable, ply)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "Table")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("Table")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_Send( ply )
+    FayLib[modName].SendHandshakePacket(netStr, "Table", localIdentifier, segmentCount, false, ply)
 end)
 
 -- send table to all players
@@ -120,12 +109,7 @@ addAPIFunction("BroadcastTable", function(netStr, inputTable)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "Table")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("Table")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_Broadcast()
+    FayLib[modName].SendHandshakePacket(netStr, "Table", localIdentifier, segmentCount, true)
 end)
 
 -- send string to specific player
@@ -141,12 +125,7 @@ addAPIFunction("SendString", function(netStr, inputString, ply)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "String")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("String")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_Send( ply )
+    FayLib[modName].SendHandshakePacket(netStr, "String", localIdentifier, segmentCount, false, ply)
 end)
 
 -- send string to all players
@@ -162,28 +141,13 @@ addAPIFunction("BroadcastString", function(netStr, inputString)
     FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "String")
 
     -- send initial handshake packet
-    net_Start( netStr )
-        net_WriteBool(true)
-        net_WriteString("String")
-        net_WriteString(localIdentifier)
-        net_WriteInt(segmentCount, 8)
-    net_Broadcast()
+    FayLib[modName].SendHandshakePacket(netStr, "String", localIdentifier, segmentCount, true)
 end)
 
 -- handle incoming packets
 net_Receive("BPACKETS_SERVREQ", function(len, ply)
     local identifier = net_ReadString()
     local segmentNum = net_ReadInt(8)
-    local netStr = FayLib[modName]["IdentifierLookup"][identifier].NetStr
-    local segmentCount = FayLib[modName]["IdentifierLookup"][identifier].SegmentCount
-    local sentType = FayLib[modName]["IdentifierLookup"][identifier].Type
 
-    net_Start( netStr )
-        net_WriteBool(false)
-        net_WriteString(sentType)
-        net_WriteString(identifier)
-        net_WriteInt(segmentCount, 8)
-        net_WriteInt(segmentNum, 8)
-        net_WriteString(FayLib[modName]["Segments"][identifier][segmentNum])
-    net_Send(ply)
+    FayLib[modName].networkReceiveFunc(identifier, segmentNum, ply)
 end)

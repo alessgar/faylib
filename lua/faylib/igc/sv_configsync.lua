@@ -75,6 +75,7 @@ local net_WriteString = net.WriteString
 local net_Broadcast = SERVER && net.Broadcast
 local net_Send = SERVER && net.Send
 local net_Receive = net.Receive
+local table_GetKeys = table.GetKeys
 
 local modName = "IGC"
 FayLib[modName] = FayLib[modName] || {}
@@ -98,7 +99,7 @@ addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMod
 		sharedMode = false
 	end
 
-	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Server")
+	keyName = FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Server")
 
 	FayLib[modName]["ConfigLookup"][addonName] = FayLib[modName]["ConfigLookup"][addonName] || {}
 	FayLib[modName]["ConfigLookup"][addonName][keyName] = sharedMode
@@ -159,6 +160,8 @@ addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
 	FayLib[modName].sharedLoadConfig(addonName, fileName, folderName, "Server")
 
 	-- copy any "shared" keys to the shared config table
+	local keyList = table_GetKeys(FayLib[modName]["Config"]["Server"][addonName])
+
 	for i = 1, #keyList do
 		if FayLib[modName]["ConfigLookup"][addonName][keyList[i]] then
 			FayLib[modName]["Config"]["Shared"][addonName][keyList[i]] = FayLib[modName]["Config"]["Server"][addonName][keyList[i]]

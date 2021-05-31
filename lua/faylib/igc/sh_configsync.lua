@@ -18,18 +18,18 @@ Note: To see the client and server API, please see the respective cl_configsync 
 
 local FayLib = FayLib
 
-local table_HasValue = table_HasValue
+local table_HasValue = table.HasValue
 local type = type
-local table_GetKeys = table_GetKeys
+local table_GetKeys = table.GetKeys
 local Color = Color
 local tostring = tostring
-local file_Read = file_Read
-local util_JSONToTable = util_JSONToTable
+local file_Read = file.Read
+local util_JSONToTable = util.JSONToTable
 local ipairs = ipairs
 local pairs = pairs
-local util_TableToJSON = util_TableToJSON
-local file_CreateDir = file_CreateDir
-local file_Write = file_Write
+local util_TableToJSON = util.TableToJSON
+local file_CreateDir = file.CreateDir
+local file_Write = file.Write
 
 local modName = "IGC"
 FayLib[modName] = FayLib[modName] || {}
@@ -164,4 +164,6 @@ FayLib[modName].sharedDefineKey = function(addonName, keyName, defaultValue, rea
     -- apply new value to config
     FayLib[modName]["Config"][realm][addonName] = FayLib[modName]["Config"][realm][addonName] || {}
     FayLib[modName]["Config"][realm][addonName][keyName] = defaultValue
+
+    return keyName
 end

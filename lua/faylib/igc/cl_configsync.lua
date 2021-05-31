@@ -68,16 +68,9 @@ IGCSharedConfigReady()
 ]]--
 
 local FayLib = FayLib
-local table_HasValue = table.HasValue
-local type = type
+
 local hook_Run = hook.Run
-local tostring = tostring
-local util_TableToJSON = util.TableToJSON
-local file_CreateDir = file.CreateDir
-local file_Write = file.Write
 local ipairs = ipairs
-local pairs = pairs
-local Color = Color
 local net_Receive = net.Receive
 local net_ReadString = net.ReadString
 local util_JSONToTable = util.JSONToTable
@@ -85,7 +78,6 @@ local table_GetKeys = table.GetKeys
 local hook_Add = hook.Add
 local net_Start = net.Start
 local net_SendToServer = CLIENT && net.SendToServer
-local file_Read = file.Read
 
 local modName = "IGC"
 FayLib[modName] = FayLib[modName] || {}
@@ -100,77 +92,9 @@ FayLib[modName]["Config"]["Client"] = FayLib[modName]["Config"]["Client"] || {}
 FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
 FayLib[modName]["Config"]["SharedReady"] = FayLib[modName]["Config"]["SharedReady"] || false
 
--- returns whether give value can be stored in config
-local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
-local function canSetAsValue(value)
-	if !table_HasValue( allowedTypes, type(value) ) then
-		return false
-	end
-
-	return true
-end
-
--- returns whether value is NaN or INF
-local function isNANOrINF(value)
-	if type(value) == "number" && (value == (1 / 0) || value != value) then
-		return true
-	end
-
-	return false
-end
-
--- returns whether value is "true" or "false" or not
-local function isStringBool(value)
-	if type(value) == "string" then
-		return value == "true" || value == "false"
-	end
-
-	return false
-end
-
--- add fix for "Colors will not have the color metatable" bug
-local function colorFix(realm, addonName)
-	local keyList = table_GetKeys(FayLib[modName]["Config"][realm][addonName])
-	for i = 1, #keyList do
-		if type(FayLib[modName]["Config"][realm][addonName][keyList[i]]) == "table" then
-			local innerTable = FayLib[modName]["Config"][realm][addonName][keyList[i]]
-			local innerKeyList = table_GetKeys(innerTable)
-			if #innerKeyList == 4 && innerTable.a != nil && innerTable.r != nil && innerTable.g != nil && innerTable.b != nil then
-				FayLib[modName]["Config"][realm][addonName][keyList[i]] = Color(innerTable.r, innerTable.g, innerTable.b, innerTable.a)
-			end
-		end
-	end
-end
-
 -- defines a key in the given addons config
 addAPIFunction("DefineClientKey", function(addonName, keyName, defaultValue)
-	-- make sure the value type is supported
-	if !canSetAsValue(defaultValue) then
-		FayLib.Backend.Log("IGC - An invalid value value being assigned to key \"" .. keyName .. "\" ", true)
-		return
-	end
-
-	-- values cannot be NAN or INF
-	if isNANOrINF(defaultValue) then
-		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
-		defaultValue = 0
-	end
-
-	-- string representations of booleans must be converted to booleans
-	if isStringBool(defaultValue) then
-		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
-		if defaultValue == "true" then
-			defaultValue = true
-		else
-			defaultValue = false
-		end
-	end
-
-	keyName = "_" .. keyName
-
-	-- apply new value to config
-	FayLib[modName]["Config"]["Client"][addonName] = FayLib[modName]["Config"]["Client"][addonName] || {}
-	FayLib[modName]["Config"]["Client"][addonName][keyName] = defaultValue
+	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Client")
 
 	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -194,32 +118,7 @@ end)
 
 -- overwrite a kay with new data
 addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
-	-- make sure the value type is supported
-	if !canSetAsValue(newValue) then
-		FayLib.Backend.Log("IGC - An invalid value was being assigned to key \"" .. keyName .. "\", so the key could not be set", true)
-		return
-	end
-
-	-- values cannot be NAN or INF
-	if isNANOrINF(newValue) then
-		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
-		newValue = 0
-	end
-
-	-- string representations of booleans must be converted to booleans
-	if isStringBool(newValue) then
-		FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
-		if newValue == "true" then
-			newValue = true
-		else
-			newValue = false
-		end
-	end
-
-	keyName = "_" .. keyName
-
-	-- apply new value to config
-	FayLib[modName]["Config"]["Client"][addonName][keyName] = newValue
+	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Client")
 
 	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -228,54 +127,12 @@ end)
 
 -- save configuration to disk
 addAPIFunction("SaveClientConfig", function(addonName, fileName, folderName)
-	if folderName == nil then
-		folderName = "faylib"
-	end
-
-	folderName = tostring(folderName)
-	fileName = tostring(fileName)
-	local saveString = util_TableToJSON( FayLib[modName]["Config"]["Client"][addonName] )
-	file_CreateDir( folderName )
-	file_Write( folderName .. "/" .. fileName .. ".json", saveString)
+	FayLib[modName].sharedSaveConfig(addonName, fileName, folderName, "Client")
 end)
 
 -- load configuration from disk
 addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
-	-- add default variable if folder name not given
-	if folderName == nil then
-		folderName = "faylib"
-	end
-
-	-- load provided config file
-	folderName = tostring(folderName)
-	fileName = tostring(fileName)
-	local loadStr = file_Read( folderName .. "/" .. fileName .. ".json", "DATA" )
-	if loadStr == nil then
-		--FayLib.Backend.Log("IGC - A save file was not found when LoadConfig was invoked, so a new one will be created based off the default values", false)
-		FayLib[modName]["SaveClientConfig"](addonName, fileName, folderName)
-		return
-	end
-
-	-- turn config into table format and check for declared config variables that are missing from file
-	local fileTable = util_JSONToTable( loadStr )
-	local fileKeyList = table_GetKeys(fileTable)
-	local verifyKeyList = table_GetKeys(FayLib[modName]["Config"]["Client"][addonName])
-	local notFoundVars = {}
-	for _,key in ipairs(verifyKeyList) do
-		if !table_HasValue(fileKeyList, key) then
-			notFoundVars[key] = FayLib[modName]["Config"]["Client"][addonName][key]
-		end
-	end
-
-	-- load config into provided addon table
-	FayLib[modName]["Config"]["Client"][addonName] = fileTable
-
-	-- add missing variables from before
-	for key,val in pairs(notFoundVars) do
-		FayLib[modName]["Config"]["Client"][addonName][key] = val
-	end
-
-	colorFix("Client", addonName)
+	FayLib[modName].sharedLoadConfig(addonName, fileName, folderName, "Client")
 
 	-- fire related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -288,7 +145,7 @@ net_Receive( "FAYLIB_IGC_SYNC", function( len )
 	local sharedString = net_ReadString()
 	FayLib[modName]["Config"]["Shared"][addonName] = util_JSONToTable( sharedString )
 
-	colorFix("Shared", addonName)
+	FayLib[modName].colorFix("Shared", addonName)
 
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCSharedConfigUpdate", addonName)
@@ -301,7 +158,7 @@ net_Receive( "FAYLIB_IGC_SYNCFIRST", function( len )
 
 	local outerKeyList = table_GetKeys(FayLib[modName]["Config"]["Shared"])
 	for _,addonName in ipairs(outerKeyList) do
-		colorFix("Shared", addonName)
+		FayLib[modName].colorFix("Shared", addonName)
 	end
 
 	FayLib[modName]["Config"]["SharedReady"] = true

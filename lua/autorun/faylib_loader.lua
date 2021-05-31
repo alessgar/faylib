@@ -1,3 +1,8 @@
+--[[
+	Fay's Library
+	version 1.0.0
+]]--
+
 FayLib = FayLib || {}
 FayLib.Backend = FayLib.Backend || {}
 

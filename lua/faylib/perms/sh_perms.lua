@@ -30,10 +30,12 @@ end
 FayLib[modName]["AdminMod"] = FayLib[modName]["AdminMod"] || {}
 FayLib[modName]["PrivList"] = FayLib[modName]["PrivList"] || {}
 
-local function isAdminModAvailable(adminMod)
+-- returns whether the requested admin mod is actively loaded
+FayLib[modName].isAdminModAvailable = function(adminMod)
     return table.HasValue(FayLib[modName].getAvailableAdminMods(), adminMod)
 end
 
+-- returns a table containing all currently running admin mods
 FayLib[modName].getAvailableAdminMods = function()
     local availableAdminMods = {"gmod"}
 
@@ -48,13 +50,16 @@ FayLib[modName].getAvailableAdminMods = function()
     return availableAdminMods
 end
 
+-- returns whether a player has the given privilege
 addAPIFunction("PlayerHasAccess", function(addonName, privName, ply)
     local adminMod = FayLib[modName]["AdminMod"][addonName]
 
-    if adminMod == nil || !isAdminModAvailable(adminMod) then
+    -- fallback if preferred admin mod not available
+    if adminMod == nil || !FayLib[modName].isAdminModAvailable(adminMod) then
         adminMod = "gmod"
     end
 
+    -- determine whether player has privilege based on admin mod
     local minAccess = FayLib[modName]["PrivList"][addonName][privName]
     if adminMod == "gmod" then
         if minAccess == "superadmin" then
@@ -65,7 +70,7 @@ addAPIFunction("PlayerHasAccess", function(addonName, privName, ply)
             return true
         end
     elseif adminMod == "ulx" then
-        return ULib.ucl.query( ply, privName, true )
+        return ULib.ucl.query( ply, privName, false )
     elseif adminMod == "fadmin" then
         local res = FAdmin.Access.PlayerHasPrivilege(ply, privName, ply, false)
 

@@ -50,12 +50,10 @@ util.AddNetworkString( "FAYLIB_Perms_AddFAdminPriv" )
 FayLib[modName]["AdminMod"] = FayLib[modName]["AdminMod"] || {}
 FayLib[modName]["PrivList"] = FayLib[modName]["PrivList"] || {}
 
+-- default gmod usergroups
 local validMinAccess = {"user", "admin", "superadmin"}
 
-local function isAdminModAvailable(adminMod)
-    return table.HasValue(FayLib[modName].getAvailableAdminMods(), adminMod)
-end
-
+-- sets the preferred admin mod for a given addon
 addAPIFunction("SetAdminMod", function(addonName, adminMod)
     FayLib[modName]["PrivList"][addonName] = FayLib[modName]["PrivList"][addonName] || {}
 
@@ -64,10 +62,13 @@ addAPIFunction("SetAdminMod", function(addonName, adminMod)
     net.Start("FAYLIB_Perms_SYNCPrivs")
         net.WriteString(util.TableToJSON(FayLib[modName]["AdminMod"]))
         net.WriteString(util.TableToJSON(FayLib[modName]["PrivList"]))
+        net.WriteBool(false)
     net.Broadcast()
 end)
 
+-- adds a new privilege to be synced
 addAPIFunction("AddPrivilege", function(addonName, privName, minAccess, comment, category )
+    -- confirm variables are not nil
     if minAccess == nil || !table.HasValue(validMinAccess, minAccess) then
         minAccess = "superadmin"
     end
@@ -80,17 +81,22 @@ addAPIFunction("AddPrivilege", function(addonName, privName, minAccess, comment,
         category = addonName
     end
 
+    -- sync privilege to client for gmod-based
     FayLib[modName]["PrivList"][addonName][privName] = minAccess
     net.Start("FAYLIB_Perms_SYNCPrivs")
         net.WriteString(util.TableToJSON(FayLib[modName]["AdminMod"]))
         net.WriteString(util.TableToJSON(FayLib[modName]["PrivList"]))
+        net.WriteBool(false)
     net.Broadcast()
 
-    if isAdminModAvailable("ulx") then
+    -- add privilege to ulx if available
+    if FayLib[modName].isAdminModAvailable("ulx") then
         ULib.ucl.registerAccess( privName, minAccess, comment, category )
     end
 
-    if isAdminModAvailable("fadmin") then
+    -- add privilege to fadmin if available
+    if FayLib[modName].isAdminModAvailable("fadmin") then
+        -- convert minAccess to a number
         local minAccessNum = 2
         if minAccess == "user" then
             minAccessNum = 0
@@ -100,6 +106,7 @@ addAPIFunction("AddPrivilege", function(addonName, privName, minAccess, comment,
 
         FAdmin.Access.AddPrivilege(privName, minAccessNum)
 
+        -- assign privilege to fadmin usergroups
         if minAccess == "superadmin" then
             RunConsoleCommand("fadmin", "addprivilege", "superadmin", privName)
         elseif minAccess == "admin" then
@@ -107,6 +114,7 @@ addAPIFunction("AddPrivilege", function(addonName, privName, minAccess, comment,
             RunConsoleCommand("fadmin", "addprivilege", "admin", privName)
         end
 
+        -- FAdmin requires the client to run some commands to make it appear on the menu
         net.Start("FAYLIB_Perms_AddFAdminPriv")
             net.WriteString(privName)
             net.WriteInt(minAccessNum, 4)
@@ -114,6 +122,7 @@ addAPIFunction("AddPrivilege", function(addonName, privName, minAccess, comment,
     end
 end)
 
+-- Updates a privileges' minAccess, only used by gmods built-in system
 addAPIFunction("UpdatePrivilege", function(addonName, privName, minAccess)
     if minAccess == nil || !table.HasValue(validMinAccess, minAccess) then
         minAccess = "superadmin"
@@ -123,16 +132,20 @@ addAPIFunction("UpdatePrivilege", function(addonName, privName, minAccess)
     net.Start("FAYLIB_Perms_SYNCPrivs")
         net.WriteString(util.TableToJSON(FayLib[modName]["AdminMod"]))
         net.WriteString(util.TableToJSON(FayLib[modName]["PrivList"]))
+        net.WriteBool(false)
     net.Broadcast()
 end)
 
+-- Sends the privilege and admin mod preference list to the client when they request it
 net.Receive("FAYLIB_Perms_SYNCPrivs", function(len, ply)
     net.Start("FAYLIB_Perms_SYNCPrivs")
         net.WriteString(util.TableToJSON(FayLib[modName]["AdminMod"]))
         net.WriteString(util.TableToJSON(FayLib[modName]["PrivList"]))
+        net.WriteBool(true)
     net.Send(ply)
 end)
 
+-- Load any privileges made before admins mods were ready into the active admin mods
 hook.Add( "InitPostEntity", "FAYLIB_Perms_SERVERINITSYNC", function()
     for addonName, addonPrivList in pairs(FayLib[modName]["PrivList"]) do
         for privName, minAccess in pairs(addonPrivList) do

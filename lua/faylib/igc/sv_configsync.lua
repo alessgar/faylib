@@ -123,7 +123,7 @@ end)
 
 -- overwrite a kay with new data
 addAPIFunction("SetKey", function(addonName, keyName, newValue)
-	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Server")
+	FayLib[modName].sharedDefineKey(addonName, keyName, newValue, "Server")
 
 	if FayLib[modName]["ConfigLookup"][addonName][keyName] then
 		FayLib[modName]["Config"]["Shared"][addonName][keyName] = newValue

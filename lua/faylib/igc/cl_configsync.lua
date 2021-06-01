@@ -118,7 +118,7 @@ end)
 
 -- overwrite a kay with new data
 addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
-	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Client")
+	FayLib[modName].sharedDefineKey(addonName, keyName, newValue, "Client")
 
 	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)

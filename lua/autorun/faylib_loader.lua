@@ -16,8 +16,14 @@ function FayLib.Backend.Log(msg, warning)
 end
 
 -- Helper function that can be used to expose API functions to the public table
-function FayLib.Backend.AddToAPI(modNme, funcName, functionCode)
-	FayLib[modNme][funcName] = functionCode
+local function addToAPI(moduleInfo)
+	local modName = moduleInfo[1]
+	local funcList = moduleInfo[2]
+	FayLib[modName] = FayLib[modName] || {}
+
+	for funcName, functionCode in pairs(funcList) do
+		FayLib[modName][funcName] = functionCode
+	end
 end
 
 FayLib.Backend.Log("Begin Load", false)
@@ -29,9 +35,9 @@ local function addFiles(modFolder, sPath)
 	if SERVER then
 		for _, f in pairs(files) do
 			if string.find(f:lower(), "sv_") then
-				include(modFolder .. sPath .. f)
+				addToAPI( include(modFolder .. sPath .. f) )
 			elseif string.find(f:lower(), "sh_") then
-				include(modFolder .. sPath .. f)
+				addToAPI( include(modFolder .. sPath .. f) )
 				AddCSLuaFile(modFolder .. sPath .. f)
 			elseif string.find(f:lower(), "cl_") then
 				AddCSLuaFile(modFolder .. sPath .. f)
@@ -39,7 +45,7 @@ local function addFiles(modFolder, sPath)
 		end
 	else
 		for _, f in pairs(files) do
-			include(modFolder .. sPath .. f)
+			addToAPI( include(modFolder .. sPath .. f) )
 		end
 	end
 	-- recursively search module directories

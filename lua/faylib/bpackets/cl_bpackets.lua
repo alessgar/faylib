@@ -55,10 +55,10 @@ local net_ReadString = net.ReadString
 local net_ReadInt = net.ReadInt
 
 local modName = "BPackets"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
 
-local function addAPIFunction(funcName, functionCode)
-    FayLib.Backend.AddToAPI(modName, funcName, functionCode)
+local function addToAPITable(funcName, functionCode)
+  funcList[funcName] = functionCode
 end
 -- END BOILERPLATE CODE
 
@@ -69,35 +69,35 @@ end
 ]]--
 
 -- send table to server
-addAPIFunction("SendTableToServer", function(netStr, inputTable)
+addToAPITable("SendTableToServer", function(netStr, inputTable)
     -- clean the table
-    local localIdentifier, segmentCount = FayLib[modName].tableSetup(inputTable)
+    local localIdentifier, segmentCount = FayLib.BPackets.tableSetup(inputTable)
 
     -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
 
-    FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "Table")
+    FayLib.BPackets.setupLookup(localIdentifier, segmentCount, netStr, "Table")
 
     -- send initial handshake packet
-    FayLib[modName].SendHandshakePacket(netStr, "Table", localIdentifier, segmentCount)
+    FayLib.BPackets.SendHandshakePacket(netStr, "Table", localIdentifier, segmentCount)
 end)
 
 -- send string to server
-addAPIFunction("SendStringToServer", function(netStr, inputString)
+addToAPITable("SendStringToServer", function(netStr, inputString)
     -- clean the string
-    local localIdentifier, segmentCount = FayLib[modName].stringSetup(inputString)
+    local localIdentifier, segmentCount = FayLib.BPackets.stringSetup(inputString)
 
     -- size limit of 5MB
     if segmentCount > 83 then
         FayLib.Backend.Log("BPackets - The string you were trying to send exceeds maximum size limits (5MB). The string will not be sent.", true)
     end
 
-    FayLib[modName].setupLookup(localIdentifier, segmentCount, netStr, "String")
+    FayLib.BPackets.setupLookup(localIdentifier, segmentCount, netStr, "String")
 
     -- send initial handshake packet
-    FayLib[modName].SendHandshakePacket(netStr, "String", localIdentifier, segmentCount)
+    FayLib.BPackets.SendHandshakePacket(netStr, "String", localIdentifier, segmentCount)
 end)
 
 -- handle incoming packets
@@ -105,5 +105,7 @@ net_Receive("BPACKETS_CLIENTREQ", function(len)
     local identifier = net_ReadString()
     local segmentNum = net_ReadInt(8)
 
-    FayLib[modName].networkReceiveFunc(identifier, segmentNum)
+    FayLib.BPackets.networkReceiveFunc(identifier, segmentNum)
 end)
+
+return {modName, funcList}

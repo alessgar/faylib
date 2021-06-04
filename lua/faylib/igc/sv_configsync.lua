@@ -78,34 +78,35 @@ local net_Receive = net.Receive
 local table_GetKeys = table.GetKeys
 
 local modName = "IGC"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
 
-local function addAPIFunction(funcName, functionCode)
-	FayLib.Backend.AddToAPI(modName, funcName, functionCode)
+local function addToAPITable(funcName, functionCode)
+	funcList[funcName] = functionCode
 end
 -- END BOILERPLATE CODE
 
 util_AddNetworkString( "FAYLIB_IGC_SYNC" )
 util_AddNetworkString( "FAYLIB_IGC_SYNCFIRST" )
 
-FayLib[modName]["Config"] = FayLib[modName]["Config"] || {}
-FayLib[modName]["Config"]["Server"] = FayLib[modName]["Config"]["Server"] || {}
-FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
-FayLib[modName]["ConfigLookup"] = FayLib[modName]["ConfigLookup"] || {}
+local newCFG = {}
+newCFG.Server = {}
+newCFG.Shared = {}
+addToAPITable("Config", newCFG)
+addToAPITable("ConfigLookup", {})
 
 -- defines a key in the given addons config
-addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMode)
+addToAPITable("DefineKey", function(addonName, keyName, defaultValue, sharedMode)
 	if sharedMode == nil then
 		sharedMode = false
 	end
 
-	keyName = FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Server")
+	keyName = FayLib.IGC.sharedDefineKey(addonName, keyName, defaultValue, "Server")
 
-	FayLib[modName]["ConfigLookup"][addonName] = FayLib[modName]["ConfigLookup"][addonName] || {}
-	FayLib[modName]["ConfigLookup"][addonName][keyName] = sharedMode
+	FayLib.IGC.ConfigLookup[addonName] = FayLib.IGC.ConfigLookup[addonName] || {}
+	FayLib.IGC.ConfigLookup[addonName][keyName] = sharedMode
 	if sharedMode then
-		FayLib[modName]["Config"]["Shared"][addonName] = FayLib[modName]["Config"]["Shared"][addonName] || {}
-		FayLib[modName]["Config"]["Shared"][addonName][keyName] = defaultValue
+		FayLib.IGC.Config.Shared[addonName] = FayLib.IGC.Config.Shared[addonName] || {}
+		FayLib.IGC.Config.Shared[addonName][keyName] = defaultValue
 	end
 
 	-- run related hooks
@@ -117,16 +118,16 @@ addAPIFunction("DefineKey", function(addonName, keyName, defaultValue, sharedMod
 end)
 
 -- gets the current state of the key in the given addon
-addAPIFunction("GetKey", function(addonName, keyName)
-	return FayLib[modName]["Config"]["Server"][addonName]["_" .. keyName]
+addToAPITable("GetKey", function(addonName, keyName)
+	return FayLib.IGC.Config.Server[addonName]["_" .. keyName]
 end)
 
 -- overwrite a kay with new data
-addAPIFunction("SetKey", function(addonName, keyName, newValue)
-	FayLib[modName].sharedDefineKey(addonName, keyName, newValue, "Server")
+addToAPITable("SetKey", function(addonName, keyName, newValue)
+	FayLib.IGC.sharedDefineKey(addonName, keyName, newValue, "Server")
 
-	if FayLib[modName]["ConfigLookup"][addonName][keyName] then
-		FayLib[modName]["Config"]["Shared"][addonName][keyName] = newValue
+	if FayLib.IGC.ConfigLookup[addonName][keyName] then
+		FayLib.IGC.Config.Shared[addonName][keyName] = newValue
 	end
 
 	-- run related hooks
@@ -138,8 +139,8 @@ addAPIFunction("SetKey", function(addonName, keyName, newValue)
 end)
 
 -- sync any updated shared variables to the client
-addAPIFunction("SyncShared", function(addonName, ply)
-	local sharedString = util_TableToJSON( FayLib[modName]["Config"]["Shared"][addonName] )
+addToAPITable("SyncShared", function(addonName, ply)
+	local sharedString = util_TableToJSON( FayLib.IGC.Config.Shared[addonName] )
 	net_Start("FAYLIB_IGC_SYNC")
 	net_WriteString(addonName)
 	net_WriteString(sharedString)
@@ -151,25 +152,25 @@ addAPIFunction("SyncShared", function(addonName, ply)
 end)
 
 -- save configuration to disk
-addAPIFunction("SaveConfig", function(addonName, fileName, folderName)
-	FayLib[modName].sharedSaveConfig(addonName, fileName, folderName, "Server")
+addToAPITable("SaveConfig", function(addonName, fileName, folderName)
+	FayLib.IGC.sharedSaveConfig(addonName, fileName, folderName, "Server")
 end)
 
 -- load configuration from disk
-addAPIFunction("LoadConfig", function(addonName, fileName, folderName)
-	FayLib[modName].sharedLoadConfig(addonName, fileName, folderName, "Server")
+addToAPITable("LoadConfig", function(addonName, fileName, folderName)
+	FayLib.IGC.sharedLoadConfig(addonName, fileName, folderName, "Server")
 
 	-- copy any "shared" keys to the shared config table
-	local keyList = table_GetKeys(FayLib[modName]["Config"]["Server"][addonName])
+	local keyList = table_GetKeys(FayLib.IGC.Config.Server[addonName])
 
 	for i = 1, #keyList do
-		if FayLib[modName]["ConfigLookup"][addonName][keyList[i]] then
-			FayLib[modName]["Config"]["Shared"][addonName][keyList[i]] = FayLib[modName]["Config"]["Server"][addonName][keyList[i]]
+		if FayLib.IGC.ConfigLookup[addonName][keyList[i]] then
+			FayLib.IGC.Config.Shared[addonName][keyList[i]] = FayLib.IGC.Config.Server[addonName][keyList[i]]
 		end
 	end
 
 	-- sync new shared table with client and fire related hooks
-	FayLib[modName]["SyncShared"](addonName)
+	FayLib.IGC.SyncShared(addonName)
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCServerConfigUpdate", addonName)
 	hook_Run("IGCSharedConfigUpdate", addonName)
@@ -177,8 +178,10 @@ end)
 
 -- when a client requests a first-time shared config sync, send off the entire shared table instead of the normal single addon table
 net_Receive( "FAYLIB_IGC_SYNCFIRST", function( len, ply )
-	local sharedString = util_TableToJSON( FayLib[modName]["Config"]["Shared"] )
+	local sharedString = util_TableToJSON( FayLib.IGC.Config.Shared )
 	net_Start("FAYLIB_IGC_SYNCFIRST")
 		net_WriteString(sharedString)
 	net_Send(ply)
 end )
+
+return {modName, funcList}

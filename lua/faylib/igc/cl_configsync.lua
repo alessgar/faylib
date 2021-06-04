@@ -80,21 +80,22 @@ local net_Start = net.Start
 local net_SendToServer = CLIENT && net.SendToServer
 
 local modName = "IGC"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
 
-local function addAPIFunction(funcName, functionCode)
-	FayLib.Backend.AddToAPI(modName, funcName, functionCode)
+local function addToAPITable(funcName, functionCode)
+	funcList[funcName] = functionCode
 end
 -- END BOILERPLATE CODE
 
-FayLib[modName]["Config"] = FayLib[modName]["Config"] || {}
-FayLib[modName]["Config"]["Client"] = FayLib[modName]["Config"]["Client"] || {}
-FayLib[modName]["Config"]["Shared"] = FayLib[modName]["Config"]["Shared"] || {}
-FayLib[modName]["Config"]["SharedReady"] = FayLib[modName]["Config"]["SharedReady"] || false
+local newCFG = {}
+newCFG.Client = {}
+newCFG.Shared = {}
+newCFG.SharedReady = false
+addToAPITable("Config", newCFG)
 
 -- defines a key in the given addons config
-addAPIFunction("DefineClientKey", function(addonName, keyName, defaultValue)
-	FayLib[modName].sharedDefineKey(addonName, keyName, defaultValue, "Client")
+addToAPITable("DefineClientKey", function(addonName, keyName, defaultValue)
+	FayLib.IGC.sharedDefineKey(addonName, keyName, defaultValue, "Client")
 
 	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -102,23 +103,23 @@ addAPIFunction("DefineClientKey", function(addonName, keyName, defaultValue)
 end)
 
 -- gets the current state of the client key in the given addon
-addAPIFunction("GetClientKey", function(addonName, keyName)
-	return FayLib[modName]["Config"]["Client"][addonName]["_" .. keyName]
+addToAPITable("GetClientKey", function(addonName, keyName)
+	return FayLib.IGC.Config.Client[addonName]["_" .. keyName]
 end)
 
 -- gets the current state of the shared key in the given addon
-addAPIFunction("GetSharedKey", function(addonName, keyName)
-	return FayLib[modName]["Config"]["Shared"][addonName]["_" .. keyName]
+addToAPITable("GetSharedKey", function(addonName, keyName)
+	return FayLib.IGC.Config.Shared[addonName]["_" .. keyName]
 end)
 
 -- fetch whether the shared cache has been fetched for the first time
-addAPIFunction("IsSharedReady", function()
-	return FayLib[modName]["Config"]["SharedReady"]
+addToAPITable("IsSharedReady", function()
+	return FayLib.IGC.Config.SharedReady
 end)
 
 -- overwrite a kay with new data
-addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
-	FayLib[modName].sharedDefineKey(addonName, keyName, newValue, "Client")
+addToAPITable("SetClientKey", function(addonName, keyName, newValue)
+	FayLib.IGC.sharedDefineKey(addonName, keyName, newValue, "Client")
 
 	-- run related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -126,13 +127,13 @@ addAPIFunction("SetClientKey", function(addonName, keyName, newValue)
 end)
 
 -- save configuration to disk
-addAPIFunction("SaveClientConfig", function(addonName, fileName, folderName)
-	FayLib[modName].sharedSaveConfig(addonName, fileName, folderName, "Client")
+addToAPITable("SaveClientConfig", function(addonName, fileName, folderName)
+	FayLib.IGC.sharedSaveConfig(addonName, fileName, folderName, "Client")
 end)
 
 -- load configuration from disk
-addAPIFunction("LoadClientConfig", function(addonName, fileName, folderName)
-	FayLib[modName].sharedLoadConfig(addonName, fileName, folderName, "Client")
+addToAPITable("LoadClientConfig", function(addonName, fileName, folderName)
+	FayLib.IGC.sharedLoadConfig(addonName, fileName, folderName, "Client")
 
 	-- fire related hooks
 	hook_Run("IGCConfigUpdate", addonName)
@@ -143,9 +144,9 @@ end)
 net_Receive( "FAYLIB_IGC_SYNC", function( len )
 	local addonName = net_ReadString()
 	local sharedString = net_ReadString()
-	FayLib[modName]["Config"]["Shared"][addonName] = util_JSONToTable( sharedString )
+	FayLib.IGC.Config.Shared[addonName] = util_JSONToTable( sharedString )
 
-	FayLib[modName].colorFix("Shared", addonName)
+	FayLib.IGC.colorFix("Shared", addonName)
 
 	hook_Run("IGCConfigUpdate", addonName)
 	hook_Run("IGCSharedConfigUpdate", addonName)
@@ -154,14 +155,14 @@ end )
 -- handles first-time shared config sync during client lua startup
 net_Receive( "FAYLIB_IGC_SYNCFIRST", function( len )
 	local sharedString = net_ReadString()
-	FayLib[modName]["Config"]["Shared"] = util_JSONToTable( sharedString )
+	FayLib.IGC.Config.Shared = util_JSONToTable( sharedString )
 
-	local outerKeyList = table_GetKeys(FayLib[modName]["Config"]["Shared"])
+	local outerKeyList = table_GetKeys(FayLib.IGC.Config.Shared)
 	for _,addonName in ipairs(outerKeyList) do
-		FayLib[modName].colorFix("Shared", addonName)
+		FayLib.IGC.colorFix("Shared", addonName)
 	end
 
-	FayLib[modName]["Config"]["SharedReady"] = true
+	FayLib.IGC.Config.SharedReady = true
 	hook_Run("IGCSharedConfigReady")
 end )
 
@@ -170,3 +171,5 @@ hook_Add( "InitPostEntity", "FAYLIB_IGC_CLIENTINITSYNC", function()
 	net_Start("FAYLIB_IGC_SYNCFIRST")
 	net_SendToServer()
 end )
+
+return {modName, funcList}

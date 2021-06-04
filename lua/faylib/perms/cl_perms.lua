@@ -26,22 +26,26 @@ boolean Perms:PlayerHasAccess(string addonName, string privName, Player ply)
 local FayLib = FayLib
 
 local modName = "Perms"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
+
+local function addToAPITable(funcName, functionCode)
+    funcList[funcName] = functionCode
+end
 -- END BOILERPLATE CODE
 
-FayLib[modName]["AdminMod"] = FayLib[modName]["AdminMod"] || {}
-FayLib[modName]["PrivList"] = FayLib[modName]["PrivList"] || {}
+addToAPITable("AdminMod", {})
+addToAPITable("PrivList", {})
 
 -- Updates the clientside privilege list and admin mod preferences list when the server says so
 net.Receive("FAYLIB_Perms_SYNCPrivs", function(len)
     local newAModString = net.ReadString()
     local newPrivsString = net.ReadString()
-    FayLib[modName]["AdminMod"] = util.JSONToTable(newAModString)
-    FayLib[modName]["PrivList"] = util.JSONToTable(newPrivsString)
+    FayLib.Perms.AdminMod = util.JSONToTable(newAModString)
+    FayLib.Perms.PrivList = util.JSONToTable(newPrivsString)
 
     -- if FAdmin is available when we first sync, we run AddPrivilege on the client so that the permissions appear on the FAdmin menu
-    if net.ReadBool() && FayLib[modName].isAdminModAvailable("fadmin") then
-        for addonName, addonPrivList in pairs(FayLib[modName]["PrivList"]) do
+    if net.ReadBool() && FayLib.Perms.isAdminModAvailable("fadmin") then
+        for addonName, addonPrivList in pairs(FayLib.Perms.PrivList) do
             for privName, minAccess in pairs(addonPrivList) do
                 -- we have to convert minAccess to a number for FAdmin
                 local minAccessNum = 2
@@ -69,3 +73,5 @@ hook.Add( "InitPostEntity", "FAYLIB_Perms_CLIENTINITSYNC", function()
     net.Start("FAYLIB_Perms_SYNCPrivs")
     net.SendToServer()
 end )
+
+return {modName, funcList}

@@ -20,23 +20,23 @@ Note: To see the client and server API, please see the respective cl_perms and s
 local FayLib = FayLib
 
 local modName = "Perms"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
 
-local function addAPIFunction(funcName, functionCode)
-    FayLib.Backend.AddToAPI(modName, funcName, functionCode)
+local function addToAPITable(funcName, functionCode)
+    funcList[funcName] = functionCode
 end
 -- END BOILERPLATE CODE
 
-FayLib[modName]["AdminMod"] = FayLib[modName]["AdminMod"] || {}
-FayLib[modName]["PrivList"] = FayLib[modName]["PrivList"] || {}
+addToAPITable("AdminMod", {})
+addToAPITable("PrivList", {})
 
 -- returns whether the requested admin mod is actively loaded
-FayLib[modName].isAdminModAvailable = function(adminMod)
-    return table.HasValue(FayLib[modName].getAvailableAdminMods(), adminMod)
-end
+addToAPITable("isAdminModAvailable", function(adminMod)
+    return table.HasValue(FayLib.Perms.getAvailableAdminMods(), adminMod)
+end)
 
 -- returns a table containing all currently running admin mods
-FayLib[modName].getAvailableAdminMods = function()
+addToAPITable("getAvailableAdminMods", function()
     local availableAdminMods = {"gmod"}
 
     if ULib != nil && ulx != nil then
@@ -48,19 +48,19 @@ FayLib[modName].getAvailableAdminMods = function()
     end
 
     return availableAdminMods
-end
+end)
 
 -- returns whether a player has the given privilege
-addAPIFunction("PlayerHasAccess", function(addonName, privName, ply)
-    local adminMod = FayLib[modName]["AdminMod"][addonName]
+addToAPITable("PlayerHasAccess", function(addonName, privName, ply)
+    local adminMod = FayLib.Perms.AdminMod[addonName]
 
     -- fallback if preferred admin mod not available
-    if adminMod == nil || !FayLib[modName].isAdminModAvailable(adminMod) then
+    if adminMod == nil || !FayLib.Perms.isAdminModAvailable(adminMod) then
         adminMod = "gmod"
     end
 
     -- determine whether player has privilege based on admin mod
-    local minAccess = FayLib[modName]["PrivList"][addonName][privName]
+    local minAccess = FayLib.Perms.PrivList[addonName][privName]
     if adminMod == "gmod" then
         if minAccess == "superadmin" then
             return ply:IsUserGroup( "superadmin" )
@@ -81,3 +81,5 @@ addAPIFunction("PlayerHasAccess", function(addonName, privName, ply)
 
     return false
 end)
+
+return {modName, funcList}

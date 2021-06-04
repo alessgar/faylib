@@ -32,52 +32,57 @@ local file_CreateDir = file.CreateDir
 local file_Write = file.Write
 
 local modName = "IGC"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
+
+local function addToAPITable(funcName, functionCode)
+    funcList[funcName] = functionCode
+end
+-- END BOILERPLATE CODE
 
 -- returns whether give value can be stored in config
 local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
-FayLib[modName].canSetAsValue = function(value)
+addToAPITable("canSetAsValue", function(value)
     if !table_HasValue( allowedTypes, type(value) ) then
         return false
     end
 
     return true
-end
+end)
 
 -- returns whether value is NaN or INF
-FayLib[modName].isNANOrINF = function(value)
+addToAPITable("isNANOrINF", function(value)
     if type(value) == "number" && (value == (1 / 0) || value != value) then
         return true
     end
 
     return false
-end
+end)
 
 -- returns whether value is "true" or "false" or not
-FayLib[modName].isStringBool = function(value)
+addToAPITable("isStringBool", function(value)
     if type(value) == "string" then
         return value == "true" || value == "false"
     end
 
     return false
-end
+end)
 
 -- add fix for "Colors will not have the color metatable" bug
-FayLib[modName].colorFix = function(realm, addonName)
-    local keyList = table_GetKeys(FayLib[modName]["Config"][realm][addonName])
+addToAPITable("colorFix", function(realm, addonName)
+    local keyList = table_GetKeys(FayLib.IGC.Config[realm][addonName])
     for i = 1, #keyList do
-        if type(FayLib[modName]["Config"][realm][addonName][keyList[i]]) == "table" then
-            local innerTable = FayLib[modName]["Config"][realm][addonName][keyList[i]]
+        if type(FayLib.IGC.Config[realm][addonName][keyList[i]]) == "table" then
+            local innerTable = FayLib.IGC.Config[realm][addonName][keyList[i]]
             local innerKeyList = table_GetKeys(innerTable)
             if #innerKeyList == 4 && innerTable.a != nil && innerTable.r != nil && innerTable.g != nil && innerTable.b != nil then
-                FayLib[modName]["Config"][realm][addonName][keyList[i]] = Color(innerTable.r, innerTable.g, innerTable.b, innerTable.a)
+                FayLib.IGC.Config[realm][addonName][keyList[i]] = Color(innerTable.r, innerTable.g, innerTable.b, innerTable.a)
             end
         end
     end
-end
+end)
 
 -- Shared code for loading configuration files
-FayLib[modName].sharedLoadConfig = function(addonName, fileName, folderName, realm)
+addToAPITable("sharedLoadConfig", function(addonName, fileName, folderName, realm)
     -- add default variable if folder name not given
     if folderName == nil then
         folderName = "faylib"
@@ -90,9 +95,9 @@ FayLib[modName].sharedLoadConfig = function(addonName, fileName, folderName, rea
     if loadStr == nil then
         --FayLib.Backend.Log("IGC - A save file was not found when LoadConfig was invoked, so a new one will be created based off the default values", false)
         if SERVER then
-            FayLib[modName]["SaveConfig"](addonName, fileName, folderName)
+            FayLib.IGC.SaveConfig(addonName, fileName, folderName)
         else
-            FayLib[modName]["SaveClientConfig"](addonName, fileName, folderName)
+            FayLib.IGC.SaveClientConfig(addonName, fileName, folderName)
         end
 
         return
@@ -101,28 +106,28 @@ FayLib[modName].sharedLoadConfig = function(addonName, fileName, folderName, rea
     -- turn config into table format and check for declared config variables that are missing from file
     local fileTable = util_JSONToTable( loadStr )
     local fileKeyList = table_GetKeys(fileTable)
-    local verifyKeyList = table_GetKeys(FayLib[modName]["Config"][realm][addonName])
+    local verifyKeyList = table_GetKeys(FayLib.IGC.Config[realm][addonName])
     local notFoundVars = {}
     for _,key in ipairs(verifyKeyList) do
         if !table_HasValue(fileKeyList, key) then
-            notFoundVars[key] = FayLib[modName]["Config"][realm][addonName][key]
+            notFoundVars[key] = FayLib.IGC.Config[realm][addonName][key]
         end
     end
 
     -- load config into provided addon table
-    FayLib[modName]["Config"][realm][addonName] = fileTable
+    FayLib.IGC.Config[realm][addonName] = fileTable
 
     -- add missing variables from before
     for key,val in pairs(notFoundVars) do
-        FayLib[modName]["Config"][realm][addonName][key] = val
+        FayLib.IGC.Config[realm][addonName][key] = val
     end
 
     -- add fix for "Colors will not have the color metatable" bug
-    FayLib[modName].colorFix(realm, addonName)
-end
+    FayLib.IGC.colorFix(realm, addonName)
+end)
 
 -- Shared code for saving configuration files
-FayLib[modName].sharedSaveConfig = function(addonName, fileName, folderName, realm)
+addToAPITable("sharedSaveConfig", function(addonName, fileName, folderName, realm)
     if folderName == nil then
         folderName = "faylib"
     end
@@ -130,27 +135,27 @@ FayLib[modName].sharedSaveConfig = function(addonName, fileName, folderName, rea
     folderName = tostring(folderName)
     fileName = tostring(fileName)
 
-    local saveString = util_TableToJSON( FayLib[modName]["Config"][realm][addonName] )
+    local saveString = util_TableToJSON( FayLib.IGC.Config[realm][addonName] )
     file_CreateDir( folderName )
     file_Write( folderName .. "/" .. fileName .. ".json", saveString)
-end
+end)
 
 -- Shared code for defining/setting config keys
-FayLib[modName].sharedDefineKey = function(addonName, keyName, defaultValue, realm)
+addToAPITable("sharedDefineKey", function(addonName, keyName, defaultValue, realm)
     -- make sure the value type is supported
-    if !FayLib[modName].canSetAsValue(defaultValue) then
+    if !FayLib.IGC.canSetAsValue(defaultValue) then
         FayLib.Backend.Log("IGC - An invalid value value being assigned to key \"" .. keyName .. "\" ", true)
         return
     end
 
     -- values cannot be NAN or INF
-    if FayLib[modName].isNANOrINF(defaultValue) then
+    if FayLib.IGC.isNANOrINF(defaultValue) then
         FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was NaN or INF, so it was set to 0 instead", true)
         defaultValue = 0
     end
 
     -- string representations of booleans must be converted to booleans
-    if FayLib[modName].isStringBool(defaultValue) then
+    if FayLib.IGC.isStringBool(defaultValue) then
         FayLib.Backend.Log("IGC - A value being assigned to key \"" .. keyName .. "\" was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead", true)
         if defaultValue == "true" then
             defaultValue = true
@@ -162,8 +167,10 @@ FayLib[modName].sharedDefineKey = function(addonName, keyName, defaultValue, rea
     keyName = "_" .. keyName
 
     -- apply new value to config
-    FayLib[modName]["Config"][realm][addonName] = FayLib[modName]["Config"][realm][addonName] || {}
-    FayLib[modName]["Config"][realm][addonName][keyName] = defaultValue
+    FayLib.IGC.Config[realm][addonName] = FayLib.IGC.Config[realm][addonName] || {}
+    FayLib.IGC.Config[realm][addonName][keyName] = defaultValue
 
     return keyName
-end
+end)
+
+return {modName, funcList}

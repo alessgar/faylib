@@ -44,46 +44,46 @@ local net_WriteBool = net.WriteBool
 local net_Broadcast = net.Broadcast
 
 local modName = "BPackets"
-FayLib[modName] = FayLib[modName] || {}
+local funcList = {}
 
-local function addAPIFunction(funcName, functionCode)
-    FayLib.Backend.AddToAPI(modName, funcName, functionCode)
+local function addToAPITable(funcName, functionCode)
+    funcList[funcName] = functionCode
 end
 -- END BOILERPLATE CODE
 
-FayLib[modName]["Segments"] = FayLib[modName]["Segments"] || {}
-FayLib[modName]["IdentifierLookup"] = FayLib[modName]["IdentifierLookup"] || {}
+addToAPITable("Segments", {})
+addToAPITable("IdentifierLookup", {})
 
-FayLib[modName]["ReceivedSegments"] = FayLib[modName]["ReceivedSegments"] || {}
-FayLib[modName]["SegmentCallbacks"] = FayLib[modName]["SegmentCallbacks"] || {}
+addToAPITable("ReceivedSegments", {})
+addToAPITable("SegmentCallbacks", {})
 
 -- returns whether give value can be stored in config
 local allowedTypes = {"number", "string", "boolean", "nil", "Vector", "Angle", "Color", "table"}
-FayLib[modName].canSetAsValue = function(value)
+addToAPITable("canSetAsValue", function(value)
     if !table_HasValue( allowedTypes, type(value) ) then
         return false
     end
 
     return true
-end
+end)
 
 -- returns whether value is NaN or INF
-FayLib[modName].isNANOrINF = function(value)
+addToAPITable("isNANOrINF", function(value)
     if type(value) == "number" && (value == (1 / 0) || value != value) then
         return true
     end
 
     return false
-end
+end)
 
 -- returns whether value is "true" or "false" or not
-FayLib[modName].isStringBool = function(value)
+addToAPITable("isStringBool", function(value)
     if type(value) == "string" then
         return value == "true" || value == "false"
     end
 
     return false
-end
+end)
 
 -- Uses all segments to piece the string/table back together, before calling the callback function
 local function completeObject(identifier, segmentCount, netStr, isTable, ply)
@@ -91,22 +91,22 @@ local function completeObject(identifier, segmentCount, netStr, isTable, ply)
 
     -- piece string together
     for i = 1, segmentCount do
-        finalString = finalString .. FayLib[modName]["ReceivedSegments"][identifier][i]
+        finalString = finalString .. FayLib.BPackets.ReceivedSegments[identifier][i]
     end
 
     -- delete data that is no longer needed
-    FayLib[modName]["ReceivedSegments"][identifier] = nil
+    FayLib.BPackets.ReceivedSegments[identifier] = nil
 
     local finalObj = finalString
 
     -- turn string back into table, if needed
     if isTable then
         finalObj = {}
-        FayLib[modName].receiveTableHelper(finalObj, util_JSONToTable(finalString))
+        FayLib.BPackets.receiveTableHelper(finalObj, util_JSONToTable(finalString))
     end
 
     -- fire callback
-    FayLib[modName]["SegmentCallbacks"][netStr](finalObj, ply)
+    FayLib.BPackets.SegmentCallbacks[netStr](finalObj, ply)
 end
 
 --[[
@@ -116,7 +116,7 @@ end
 ]]--
 
 -- recursive function to fix data that may have been broken
-FayLib[modName].receiveTableHelper = function(root, inputTable)
+addToAPITable("receiveTableHelper", function(root, inputTable)
     for key,value in pairs(inputTable) do
         if type(value) == "table" then
             root[key] = {}
@@ -124,19 +124,19 @@ FayLib[modName].receiveTableHelper = function(root, inputTable)
             if #innerKeyList == 4 && value.a != nil && value.r != nil && value.g != nil && value.b != nil then
                 root[key] = Color(value.r, value.g, value.b, value.a)
             else
-                FayLib[modName].receiveTableHelper(root[key], value)
+                FayLib.BPackets.receiveTableHelper(root[key], value)
             end
         else
             root[key] = value
         end
     end
-end
+end)
 
 -- reused code between both sv and cl APIs, used to request next segment of table/string
-FayLib[modName].networkReceiveFunc = function(identifier, segmentNum, ply)
-    local netStr = FayLib[modName]["IdentifierLookup"][identifier].NetStr
-    local segmentCount = FayLib[modName]["IdentifierLookup"][identifier].SegmentCount
-    local sentType = FayLib[modName]["IdentifierLookup"][identifier].Type
+addToAPITable("networkReceiveFunc", function(identifier, segmentNum, ply)
+    local netStr = FayLib.BPackets.IdentifierLookup[identifier].NetStr
+    local segmentCount = FayLib.BPackets.IdentifierLookup[identifier].SegmentCount
+    local sentType = FayLib.BPackets.IdentifierLookup[identifier].Type
 
     net_Start( netStr )
         net_WriteBool(false)
@@ -144,13 +144,13 @@ FayLib[modName].networkReceiveFunc = function(identifier, segmentNum, ply)
         net_WriteString(identifier)
         net_WriteInt(segmentCount, 8)
         net_WriteInt(segmentNum, 8)
-        net_WriteString(FayLib[modName]["Segments"][identifier][segmentNum])
+        net_WriteString(FayLib.BPackets.Segments[identifier][segmentNum])
     if SERVER then net_Send(ply) else net_SendToServer() end
-end
+end)
 
 -- The equivalent of net.Receive, but for our large tables.
-addAPIFunction("SetupReceiver", function(netStr, callback)
-    FayLib[modName]["SegmentCallbacks"][netStr] = callback
+addToAPITable("SetupReceiver", function(netStr, callback)
+    FayLib.BPackets.SegmentCallbacks[netStr] = callback
 
     net_Receive(netStr, function(len, ply)
         local mode = net_ReadBool()
@@ -160,7 +160,7 @@ addAPIFunction("SetupReceiver", function(netStr, callback)
 
         -- determine whether handsake or data chunk message
         if mode then
-            FayLib[modName]["ReceivedSegments"][identifier] = {}
+            FayLib.BPackets.ReceivedSegments[identifier] = {}
 
             -- request first data chunk message
             if SERVER then net_Start( "BPACKETS_CLIENTREQ" ) else net_Start( "BPACKETS_SERVREQ" ) end
@@ -170,10 +170,10 @@ addAPIFunction("SetupReceiver", function(netStr, callback)
         else
             -- store data chunk for concatenation later
             local segmentNum = net_ReadInt(8)
-            FayLib[modName]["ReceivedSegments"][identifier][segmentNum] = net_ReadString()
+            FayLib.BPackets.ReceivedSegments[identifier][segmentNum] = net_ReadString()
 
             -- check if all chunks received
-            if #table_GetKeys(FayLib[modName]["ReceivedSegments"][identifier]) == segmentCount then
+            if #table_GetKeys(FayLib.BPackets.ReceivedSegments[identifier]) == segmentCount then
                 -- if true, concatenate and fire callback
                 if sentType == "Table" then
                     completeObject(identifier, segmentCount, netStr, true, ply)
@@ -198,7 +198,7 @@ end)
 ]]--
 
 -- Send the handshake packet, which informs the other end (assuming receiver is set up) about a new table/string incoming
-FayLib[modName].SendHandshakePacket = function(netStr, objType, localIdentifier, segmentCount, broadcast, ply)
+addToAPITable("SendHandshakePacket", function(netStr, objType, localIdentifier, segmentCount, broadcast, ply)
     net_Start( netStr )
         net_WriteBool(true)
         net_WriteString("Table")
@@ -213,16 +213,16 @@ FayLib[modName].SendHandshakePacket = function(netStr, objType, localIdentifier,
     else
         net_SendToServer()
     end
-end
+end)
 
 -- recursive function to clean data and make a deep copy
-FayLib[modName].writeTableHelper = function(root, inputTable)
+addToAPITable("writeTableHelper", function(root, inputTable)
     for key,value in pairs(inputTable) do
         if type(value) == "table" then -- recursion
             root[key] = {}
-            FayLib[modName].writeTableHelper(root[key], value)
-        elseif FayLib[modName].canSetAsValue(value) && !FayLib[modName].isNANOrINF(v) then -- check for valid values for networked table
-            if FayLib[modName].isStringBool(value) then -- check if string representaiton of bool (must be converted)
+            FayLib.BPackets.writeTableHelper(root[key], value)
+        elseif FayLib.BPackets.canSetAsValue(value) && !FayLib.BPackets.isNANOrINF(v) then -- check for valid values for networked table
+            if FayLib.BPackets.isStringBool(value) then -- check if string representaiton of bool (must be converted)
                 FayLib.Backend.Log("BPackets - A value (" .. tostring(key) .. " , " .. tostring(value) .. ") was a string equal to \"true\" or \"false\", so it was set to the respective boolean value instead due to techinical limits.", true)
 
                 if value == "true" then
@@ -237,10 +237,10 @@ FayLib[modName].writeTableHelper = function(root, inputTable)
             FayLib.Backend.Log("BPackets - A value (" .. tostring(key) .. " , " .. tostring(value) .. ") is unable to be written to tables due to technical limits. It will be removed from the final table.", true)
         end
     end
-end
+end)
 
 -- prepares a given string for transmission
-FayLib[modName].stringSetup = function(inputString)
+addToAPITable("stringSetup", function(inputString)
     -- determine size of string
     local tableSize = string_len( inputString ) + 1
 
@@ -249,43 +249,45 @@ FayLib[modName].stringSetup = function(inputString)
 
     local localIdentifier = tostring(math_random( 1, 1000000 ))
 
-    FayLib[modName]["Segments"][localIdentifier] = {}
+    FayLib.BPackets.Segments[localIdentifier] = {}
     for i = 1, segmentCount do
-        FayLib[modName]["Segments"][localIdentifier][i] = string_sub(inputString, 0, 60000)
+        FayLib.BPackets.Segments[localIdentifier][i] = string_sub(inputString, 0, 60000)
         inputString = string_sub(inputString, 60001)
     end
 
     return localIdentifier, segmentCount
-end
+end)
 
 -- converts a table into a string to prepare it for transmission
-FayLib[modName].tableSetup = function(inputTable)
+addToAPITable("tableSetup", function(inputTable)
     local sendingTable = {}
-    FayLib[modName].writeTableHelper(sendingTable, inputTable)
+    FayLib.BPackets.writeTableHelper(sendingTable, inputTable)
 
     -- convert table to string
     local tableString = util_TableToJSON( sendingTable )
 
-    return FayLib[modName].stringSetup(tableString)
-end
+    return FayLib.BPackets.stringSetup(tableString)
+end)
 
 -- save identifying information about an identifier for later
-FayLib[modName].setupLookup = function(localIdentifier, segmentCount, netStr, sentType)
-    FayLib[modName]["IdentifierLookup"][localIdentifier] = {
+addToAPITable("setupLookup", function(localIdentifier, segmentCount, netStr, sentType)
+    FayLib.BPackets.IdentifierLookup[localIdentifier] = {
         NetStr = netStr,
         SegmentCount = segmentCount,
         Type = sentType,
         CreationTime = os_time(),
     }
-end
+end)
 
 -- every minute, remove any leftover packets that are more than 10 minutes old for security/memory saving
 timer_Create( "BPACKETS_CLEANUP", 60, 0, function()
     local curTime = os_time()
-    for identifier,identifierInfo in pairs(FayLib[modName]["IdentifierLookup"]) do
+    for identifier,identifierInfo in pairs(FayLib.BPackets.IdentifierLookup) do
         if curTime - identifierInfo.CreationTime > 600 then
-            FayLib[modName]["IdentifierLookup"][identifier] = nil
-            FayLib[modName]["Segments"][identifier] = nil
+            FayLib.BPackets.IdentifierLookup[identifier] = nil
+            FayLib.BPackets.Segments[identifier] = nil
         end
     end
 end)
+
+return {modName, funcList}

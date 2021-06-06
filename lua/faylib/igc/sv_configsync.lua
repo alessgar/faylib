@@ -126,6 +126,8 @@ end)
 addToAPITable("SetKey", function(addonName, keyName, newValue)
 	FayLib.IGC.sharedDefineKey(addonName, keyName, newValue, "Server")
 
+	keyName = "_" .. keyName
+
 	if FayLib.IGC.ConfigLookup[addonName][keyName] then
 		FayLib.IGC.Config.Shared[addonName][keyName] = newValue
 	end
